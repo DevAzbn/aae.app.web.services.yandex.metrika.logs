@@ -1,0 +1,10 @@
+{
+	"app" : {
+		"id" : "2ed396a5c0304119b7eda2a086b48937",
+		"secret" : "f1b25dd0796646e5aab6d3b9fca3467e",
+		"callback_url" : "https://oauth.yandex.ru/verification_code?ncrnd=638188&status=ok"
+	},
+	"metrika" : {
+		"base_url" : "https://api-metrika.yandex.ru"
+	}
+}
