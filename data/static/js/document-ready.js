@@ -23,10 +23,12 @@ $(function() {
 								(function(c){
 									
 									var item = $('<div/>', {
-										html : c.name + ' (' + c.site + ')',
+										html : c.name + ' (' + c.site + ' ' + c.id + ')',
 									});
 									
 									item.appendTo(block);
+									
+									console.dir(c);
 									
 								})(data.response.counters[i]);
 								

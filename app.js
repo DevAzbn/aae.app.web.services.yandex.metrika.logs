@@ -67,7 +67,7 @@ azbn.mdl('express').use(express_session({
 		maxAge : 1000 * 86400 * 30,
 	},
 	store : new NeDBStore({
-		filename : app.path.data + '/sessions.nedb',
+		filename : app.path.data + '/sessions/sessions.nedb',
 	}),
 }));
 
