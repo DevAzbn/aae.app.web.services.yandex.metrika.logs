@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Hello Analytics – краткое руководство по JavaScript</title>
+</head>
+<body>
+
+<button id="auth-button" hidden>Авторизация</button>
+
+<h1>Analytics</h1>
+
+<textarea cols="80" rows="20" id="query-output"></textarea>
+
+<script>
+
+// Замена на собственный идентификатор клиента из консоли разработчика.
+var CLIENT_ID = '1044661237413-dm03q4s98qqlcfrsg060qi0v3deipinj.apps.googleusercontent.com';
+//VE4IDGxtTC55z9i5-ktYRapp
+
+// Определение авторизованной области применения.
+var SCOPES = [
+	'https://www.googleapis.com/auth/analytics',
+	'https://www.googleapis.com/auth/analytics.readonly',
+	'https://www.googleapis.com/auth/analytics.edit',
+];
+
+var __acc, __prof, __prop;
+
+function authorize(event) {
+    // Обработка потока авторизации.
+    // При вызове по нажатию кнопки переменной "immediate" должно быть присвоено значение "false".
+	var useImmdiate = event ? false : true;
+	
+    var authData = {
+		client_id: CLIENT_ID,
+		scope: SCOPES,
+		immediate: useImmdiate
+	};
+	
+	gapi.auth.authorize(authData, function(response) {
+		
+		var authButton = document.getElementById('auth-button');
+		
+		if (response.error) {
+			authButton.hidden = false;
+		} else {
+			authButton.hidden = true;
+			queryAccounts();
+		}
+
+	});
+
+}
+
+
+function queryAccounts() {
+	// Загрузка клиентской библиотеки Google Analytics.
+	gapi.client.load('analytics', 'v3').then(function() {
+		
+		// Получение списка всех аккаунтов Google Analytics для этого пользователя.
+		gapi.client.analytics.management.accounts.list().then(handleAccounts);
+
+	});
+
+}
+
+
+function handleAccounts(response) {
+	// Обработка ответа от метода accounts.list.
+	if (response.result.items && response.result.items.length) {
+		
+		// Получение первого аккаунта Google Analytics.
+		var firstAccountId = response.result.items[3].id;
+		
+		//var formattedJson = JSON.stringify(response, null, 2);
+		//document.getElementById('query-output').value = formattedJson;
+
+		__acc = firstAccountId;
+
+		// Запрос списка ресурсов.
+		queryProperties(firstAccountId);
+	
+	} else {
+		
+		console.log('No accounts found for this user.');
+	
+	}
+
+}
+
+
+function queryProperties(accountId) {
+	// Получение списка всех ресурсов этого аккаунта.
+	gapi.client.analytics.management.webproperties.list({
+		'accountId' : accountId
+	})
+		.then(handleProperties)
+		.then(null, function(err) {
+			// Запись всех ошибок в журнал.
+			console.log(err);
+		});
+
+}
+
+
+function handleProperties(response) {
+	// Обработка ответа от метода webproperties list.
+	if (response.result.items && response.result.items.length) {
+		
+		// Получение первого аккаунта Google Analytics.
+		var firstAccountId = response.result.items[0].accountId;
+		__acc = firstAccountId;
+
+		// Получение идентификатора первого ресурса.
+		var firstPropertyId = response.result.items[0].id;
+		__prop = firstPropertyId;
+
+		// Запрос представлений (профилей).
+		queryProfiles(firstAccountId, firstPropertyId);
+	
+	} else {
+		
+		console.log('No properties found for this user.');
+	
+	}
+
+}
+
+
+function queryProfiles(accountId, propertyId) {
+	
+	// Получение списка всех представлений (профилей) для первого ресурса первого аккаунта.
+	gapi.client.analytics.management.profiles.list({
+		'accountId': accountId,
+		'webPropertyId': propertyId,
+	})
+	.then(handleProfiles)
+	.then(null, function(err) {
+		// Запись всех ошибок в журнал.
+		console.log(err);
+	});
+
+}
+
+
+function handleProfiles(response) {
+	
+	// Обработка ответа от метода profiles list.
+	if (response.result.items && response.result.items.length) {
+		// Получение идентификатора первого представления (профиля).
+    	var firstProfileId = response.result.items[0].id;
+		__prof = firstProfileId;
+
+		// Запрос к Core Reporting API.
+		//queryCoreReportingApi(firstProfileId);
+	
+		var request = gapi.client.analytics.management.goals.list({
+			'accountId': __acc,
+			'webPropertyId': __prop,
+			'profileId' : __prof,
+		});
+		request.execute(function(response){
+			
+			//console.dir(response);
+
+			var formattedJson = JSON.stringify(response, null, 2);
+			document.getElementById('query-output').value = formattedJson;
+
+		});
+
+	} else {
+		console.log('No views (profiles) found for this user.');
+	}
+
+}
+
+
+function queryCoreReportingApi(profileId) {
+	
+	// Запрос к Core Reporting API о количестве сессий за последние семь дней.
+	
+	gapi.client.analytics.data.ga.get({
+		'ids': 'ga:' + profileId,
+		'start-date': '7daysAgo',
+		'end-date': 'today',
+		'metrics': 'ga:sessions'
+	})
+	.then(function(response) {
+		var formattedJson = JSON.stringify(response.result, null, 2);
+		document.getElementById('query-output').value = formattedJson;
+	})
+	.then(null, function(err) {
+		// Запись всех ошибок в журнал.
+		console.log(err);
+	});
+
+}
+
+	// Добавление блока прослушивания событий к кнопке авторизации (auth-button).
+	document.getElementById('auth-button').addEventListener('click', authorize);
+
+
+
+
+
+
+
+
+
+/*
+ * Example 1:
+ * Requests a list of all goals for the authorized user.
+ */
+ function listGoals() {
+	var request = gapi.client.analytics.management.goals.list({
+		'accountId': '123456',
+		'webPropertyId': 'UA-123456-1',
+		'profileId': '7654321'
+	});
+	request.execute(printGoals);
+}
+
+/*
+ * Example 2:
+ * The results of the list method are passed as the results object.
+ * The following code shows how to iterate through them.
+ */
+function printGoals(results) {
+  if (results && !results.error) {
+    var goals = results.items;
+    for (var i = 0, goal; goal = goals[i]; i++) {
+      console.log('Account Id: ' + goal.accountId);
+      console.log('Property Id: ' + goal.webPropertyId);
+      console.log('Internal Property Id: ' + goal.internalWebPropertyId);
+      console.log('View (Profile) Id: ' + goal.profileId);
+
+      console.log('Goal Id: ' + goal.id);
+      console.log('Goal Name: ' + goal.name);
+      console.log('Goal Value: ' + goal.value);
+      console.log('Goal Active: ' + goal.active);
+      console.log('Goal Type: ' + goal.type);
+
+      console.log('Created: ' + goal.created);
+      console.log('Updated: ' + goal.updated);
+
+      // Print the goal details depending on the type of goal.
+      if (goal.urlDestinationDetails) {
+        printDestinationDetails(goal.urlDestinationDetails);
+      } else if (goal.visitTimeOnSiteDetails) {
+        printComparisonDetails(goal.visitTimeOnSiteDetails);
+      } else if (goal.visitNumPagesDetails) {
+        printComparisonDetails(goal.visitNumPagesDetails);
+      } else if (goal.eventDetails) {
+        printEventDetails(goal.eventDetails);
+      }
+    }
+  }
+}
+
+
+function printDestinationDetails(details) {
+  console.log('Goal URL: ' + details.url);
+  console.log('Case Sensitive: ' + details.caseSensitive);
+  console.log('Match Type: ' + details.matchType);
+  console.log('First Step Required: ' + details.firstStepRequired);
+
+  // Iterate through the steps.
+  var steps = details.steps;
+  if (steps) {
+    for (var i = 0, step; step = steps[i]; i++) {
+      console.log('Step Number: ' + step.number);
+      console.log('Step Name: ' + step.name);
+      console.log('Step URL: ' + step.url);
+    }
+  } else {
+    console.log('No Steps Configured.');
+  }
+}
+
+function printComparisonDetails(details) {
+  console.log('Comparison Type: ' + details.comparisonType);
+  console.log('Comparison Value: ' + details.comparisonValue);
+}
+
+function printEventDetails(details) {
+  var conditions = details.eventContitions;
+  if (conditions) {
+    for (var i = 0, condition; condition = conditions[i]; i++) {
+      console.log('Condition Type: ' + condition.type);
+      if (condition.type == 'VALUE') {
+        console.log('Comparison Type: ' + condition.comparisonType);
+        console.log('Comparison Value: ' + condition.comparisonValue);
+      } else {
+        console.log('Match Type: ' + condition.matchType);
+        console.log('Expression: ' + condition.expression);
+      }
+    }
+  }
+}
+
+
+
+
+
+
+function insertGoal() {
+  var request = gapi.client.analytics.management.goals.insert({
+      "accountId": __acc,
+      "webPropertyId": __prop,
+	  "profileId": __prof,
+	  'resource': {
+        //'id': '7',
+        'active': true,
+        'name': 'next test target',
+        'type': 'EVENT',
+		"eventDetails": {
+			"useEventValue": true,
+			"eventConditions": [
+			{
+				"type": "CATEGORY",
+				"matchType": "EXACT",
+				"expression": "event"
+			},
+			{
+				"type": "ACTION",
+				"matchType": "EXACT",
+				"expression": "action"
+			},
+			{
+				"type": "LABEL",
+				"matchType": "EXACT",
+				"expression": "default2"
+			},
+			{
+				"type": "VALUE",
+				"comparisonType": "EQUAL",
+				"comparisonValue": "1"
+			}
+			]
+    	}
+      }
+     
+    });
+  request.execute(function (response) {
+		var formattedJson = JSON.stringify(response.result, null, 2);
+		document.getElementById('query-output').value = formattedJson;
+  });
+}
+
+
+
+</script>
+
+<script src="https://apis.google.com/js/client.js?onload=authorize"></script>
+
+</body>
+</html>
